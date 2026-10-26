@@ -1,0 +1,5 @@
+.DS_Store
+*.log
+# Personal icon files stay local and are never uploaded
+custom.icns
+custom.png
