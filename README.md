@@ -6,9 +6,9 @@ After every O+ Connect update, its icon on macOS often turns into a plain folder
 
 ## 原理 / How it works
 
-更新程序会整个替换应用包，而 macOS 的图标缓存没有及时登记新版本，于是把它当成文件夹显示。O+iconKit 安装一个用户级的 LaunchAgent，用 launchd 的 WatchPaths 监视应用路径。路径一有变化，脚本先等更新程序写完文件，再调用 lsregister 重新登记应用并重启程序坞。自定义图标通过 NSWorkspace 写入，因为它存放在应用包内部，每次更新都会被抹掉，所以脚本会在每次更新后重新写一次。脚本会记录已处理过的版本，避免自己写入图标时又触发自己。
+更新程序会整个替换应用包，而 macOS 的图标缓存没有及时登记新版本，于是把它当成文件夹显示。O+iconKit 安装一个用户级的 LaunchAgent，用 launchd 的 WatchPaths 监视应用路径。路径一有变化，脚本先等更新程序写完文件，再调用 lsregister 重新登记应用；如果 O+ Connect 显示在程序坞里，还会重启程序坞来刷新图标。自定义图标通过 NSWorkspace 写入，因为它存放在应用包内部，每次更新都会被抹掉，所以脚本会在每次更新后重新写一次。脚本会记录已处理过的版本，避免自己写入图标时又触发自己。
 
-The updater replaces the entire app bundle, and the macOS icon cache doesn't register the new version in time, so it shows up as a folder. O+iconKit installs a per user LaunchAgent that uses launchd's WatchPaths to watch the app's path. When the path changes, the script waits for the updater to finish writing, then calls lsregister to re-register the app and restarts the Dock. A custom icon is written through NSWorkspace; since it lives inside the app bundle and is wiped by every update, the script writes it again after each update. The script remembers which version it has already handled, so writing the icon doesn't trigger itself again.
+The updater replaces the entire app bundle, and the macOS icon cache doesn't register the new version in time, so it shows up as a folder. O+iconKit installs a per user LaunchAgent that uses launchd's WatchPaths to watch the app's path. When the path changes, the script waits for the updater to finish writing, then calls lsregister to re-register the app, and restarts the Dock to refresh the icon if O+ Connect is shown there. A custom icon is written through NSWorkspace; since it lives inside the app bundle and is wiped by every update, the script writes it again after each update. The script remembers which version it has already handled, so writing the icon doesn't trigger itself again.
 
 ## 安装 / Install
 
@@ -22,6 +22,11 @@ cd oplus-icon-kit
 chmod +x install.sh uninstall.sh
 ./install.sh
 ```
+
+> [!NOTE]
+> **桌面会闪一下是正常的。** 安装时以及每次 O+ Connect 更新之后，屏幕上的程序坞、桌面和壁纸可能会短暂消失再重新出现，大约一两秒。这是 O+iconKit 在重启程序坞来刷新图标，不会关闭任何应用，也不会丢失任何内容。平时开机登录不会出现。如果不想看到这个闪烁，可以用 `./install.sh --dock never` 安装，详见下方“程序坞刷新”一节。
+>
+> **A brief screen flash is normal.** During installation and after each O+ Connect update, the Dock, desktop and wallpaper may disappear and reappear for a second or two. This is O+iconKit restarting the Dock to refresh the icon; it doesn't close any apps or lose anything. It never happens on ordinary logins. If you'd rather not see it, install with `./install.sh --dock never`; see the Dock refresh section below for details.
 
 同时使用自定义图标（建议 1024×1024 的正方形 PNG，也支持 ICNS 和 JPG）：
 
@@ -64,7 +69,21 @@ sudo chown -R "$(whoami)" "/Applications/O+Connect.app"
 To run it immediately, use the command below. Activity is logged to ~/Library/Logs/OplusIconKit.log; check there first if anything goes wrong.
 
 ```bash
-bash ~/Library/Application\ Support/OplusIconKit/iconkit.sh --force
+~/Library/Application\ Support/OplusIconKit/O+iconKit.app/Contents/MacOS/O+iconKit --force
+```
+
+在系统设置的“登录项与扩展”里，O+iconKit 会以自己的名字出现在后台项目中，可以随时在那里关闭。
+
+In System Settings under Login Items & Extensions, O+iconKit appears under its own name among the background items, and you can switch it off there at any time.
+
+## 程序坞刷新 / Dock refresh
+
+程序坞有自己的图标缓存，只有重启才会重新读取，而重启程序坞会让桌面和壁纸短暂重绘一下。所以默认的 auto 模式只在 O+ Connect 固定在程序坞或正在运行时才重启程序坞，并且只在应用真正更新之后发生，平时登录不会触发。也可以用 --dock always 每次都刷新，或用 --dock never 完全不刷新，这时访达里的图标仍会更新，程序坞里的图标要等下次重启电脑或注销后才变。
+
+The Dock keeps its own icon cache and only reloads it when it restarts, and restarting the Dock briefly redraws the desktop and wallpaper. So the default auto mode only restarts the Dock when O+ Connect is pinned there or running, and only after the app has actually updated; ordinary logins never trigger it. You can also use --dock always to refresh every time, or --dock never to never refresh; Finder still updates in that case, while the Dock icon changes after your next restart or log out.
+
+```bash
+./install.sh --dock never
 ```
 
 ## 卸载 / Uninstall

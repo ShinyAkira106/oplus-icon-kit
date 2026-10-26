@@ -8,10 +8,12 @@
 #   ./uninstall.sh --restore-icon   # also remove the custom icon from the app
 #
 
-LABEL="local.oplusiconkit"
+LABEL="io.github.shinyakira106.oplusiconkit"
+OLD_LABEL="local.oplusiconkit"
 SUPPORT_DIR="$HOME/Library/Application Support/OplusIconKit"
-PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
+KIT_APP="$SUPPORT_DIR/O+iconKit.app"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
+UID_NUM="$(id -u)"
 
 RESTORE=0
 [ "${1:-}" = "--restore-icon" ] && RESTORE=1
@@ -31,8 +33,13 @@ if [ "$RESTORE" -eq 1 ] && [ -f "$SUPPORT_DIR/config.sh" ]; then
   fi
 fi
 
-launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || launchctl unload "$PLIST" 2>/dev/null
-rm -f "$PLIST"
+for label in "$LABEL" "$OLD_LABEL"; do
+  plist="$HOME/Library/LaunchAgents/$label.plist"
+  launchctl bootout "gui/$UID_NUM/$label" 2>/dev/null || launchctl unload "$plist" 2>/dev/null
+  rm -f "$plist"
+done
+
+[ -d "$KIT_APP" ] && "$LSREGISTER" -u "$KIT_APP" 2>/dev/null
 rm -rf "$SUPPORT_DIR"
 
 echo "O+iconKit removed. The log at ~/Library/Logs/OplusIconKit.log was kept; delete it if you like."

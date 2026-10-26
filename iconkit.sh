@@ -7,7 +7,7 @@
 # Normally run by launchd; can also be run by hand with --force.
 #
 
-SUPPORT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SUPPORT_DIR="$HOME/Library/Application Support/OplusIconKit"
 CONFIG="$SUPPORT_DIR/config.sh"
 STAMP_FILE="$SUPPORT_DIR/last_stamp"
 LSREGISTER="/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister"
@@ -87,10 +87,34 @@ if [ -n "${ICON_PATH:-}" ]; then
   fi
 fi
 
-# Make macOS re-register the bundle as an app, then refresh the Dock.
+# Make macOS re-register the bundle as an app. This alone refreshes Finder.
 touch "$APP_PATH"
 "$LSREGISTER" -f "$APP_PATH"
-killall Dock 2>/dev/null
+
+# The Dock keeps its own icon cache and only reloads it when it restarts.
+# Restarting the Dock also redraws the desktop and wallpaper for a moment,
+# so by default it only happens when O+ Connect is actually shown in the
+# Dock (pinned or running). DOCK_REFRESH can be auto, always or never.
+bundle_id="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$INFO_PLIST" 2>/dev/null)"
+in_dock=0
+if [ -n "$bundle_id" ] && defaults read com.apple.dock persistent-apps 2>/dev/null | grep -q "\"$bundle_id\""; then
+  in_dock=1
+elif pgrep -f "$APP_PATH/Contents/MacOS/" >/dev/null 2>&1; then
+  in_dock=1
+fi
+
+case "${DOCK_REFRESH:-auto}" in
+  always) restart_dock=1 ;;
+  never)  restart_dock=0 ;;
+  *)      restart_dock="$in_dock" ;;
+esac
+
+if [ "$restart_dock" -eq 1 ]; then
+  killall Dock 2>/dev/null
+  log "Dock refreshed."
+else
+  log "Dock refresh skipped (mode: ${DOCK_REFRESH:-auto})."
+fi
 
 echo "$stamp" > "$STAMP_FILE"
 log "Done."
